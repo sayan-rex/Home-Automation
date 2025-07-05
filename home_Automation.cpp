@@ -1,174 +1,153 @@
 #define BLYNK_PRINT Serial
+
 #include <ESP8266WiFi.h>
 #include <BlynkSimpleEsp8266.h>
 #include <DHT.h>
 
-char auth[] = ""; // Enter your Auth token
-char ssid[] = ""; // Enter your WIFI name
-char pass[] = ""; // Enter your WIFI password
+// ========== Credentials ==========
+char auth[] = "Your_Blynk_Auth_Token";
+char ssid[] = "Your_WiFi_SSID";
+char pass[] = "Your_WiFi_Password";
 
-DHT dht(D8, DHT11); //(sensor pin,sensor type)
+// ========== Pin Definitions ==========
+#define RELAY_LIGHT D0     // GPIO16
+#define RELAY_FAN D1       // GPIO5
+#define RELAY_PUMP D2      // GPIO4
+#define DHTPIN D3          // GPIO0
+#define FLAME_SENSOR D4    // GPIO2
+#define BUZZER D5          // GPIO14
+#define PIR_SENSOR D6      // GPIO12
+#define TRIG_PIN D7        // GPIO13
+#define ECHO_PIN D8        // GPIO15
+
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+
 BlynkTimer timer;
-bool pirbutton = 0;
 
-#define Buzzer D0
-#define flame D1
-#define PIR D7
-#define trig D5
-#define echo D6
-#define LED D2
-#define motor D4
-#define pwm D3 // GPIO 0
+// ========== State Variables ==========
+bool pirAlertEnabled = true;
+unsigned long lastMotionAlert = 0;
+unsigned long lastFlameAlert = 0;
+#define ALERT_DELAY 10000 // 10 sec cooldown
 
-byte degree[8] =
-    {
-        0b00011,
-        0b00011,
-        0b00000,
-        0b00000,
-        0b00000,
-        0b00000,
-        0b00000,
-        0b00000};
+// ========== Blynk Virtual Pins ==========
+/*
+V0 - Button: Light (RELAY_LIGHT)
+V1 - Button: Fan (RELAY_FAN)
+V2 - Button: Pump (RELAY_PUMP)
+V3 - Switch: PIR Motion Alerts ON/OFF
+V4 - Display: Temperature
+V5 - Display: Humidity
+V6 - Display: Water Level
+V7 - LED: Fire Alert Indicator
+*/
 
-BLYNK_WRITE(V0)
-{
-    pirbutton = param.asInt();
+// ========== Blynk Controls ==========
+BLYNK_WRITE(V0) { digitalWrite(RELAY_LIGHT, param.asInt()); }
+BLYNK_WRITE(V1) { digitalWrite(RELAY_FAN, param.asInt()); }
+BLYNK_WRITE(V2) { digitalWrite(RELAY_PUMP, param.asInt()); }
+BLYNK_WRITE(V3) { pirAlertEnabled = param.asInt(); }
+
+void setup() {
+  Serial.begin(9600);
+
+  // Pin Setup
+  pinMode(RELAY_LIGHT, OUTPUT);
+  pinMode(RELAY_FAN, OUTPUT);
+  pinMode(RELAY_PUMP, OUTPUT);
+  pinMode(FLAME_SENSOR, INPUT);
+  pinMode(BUZZER, OUTPUT);
+  pinMode(PIR_SENSOR, INPUT);
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+
+  // Default States
+  digitalWrite(RELAY_LIGHT, LOW);
+  digitalWrite(RELAY_FAN, LOW);
+  digitalWrite(RELAY_PUMP, LOW);
+  digitalWrite(BUZZER, LOW);
+
+  dht.begin();
+  Blynk.begin(auth, ssid, pass);
+
+  // Timed Tasks
+  timer.setInterval(2000L, readDHT);
+  timer.setInterval(1000L, checkFlame);
+  timer.setInterval(1000L, checkPIR);
+  timer.setInterval(3000L, checkWaterLevel);
 }
 
-void setup()
-{
-    Serial.begin(9600);
-    pinMode(Buzzer, OUTPUT);
-    pinMode(flame, INPUT);
-    pinMode(PIR, INPUT);
-    pinMode(trig, OUTPUT);
-    pinMode(echo, INPUT);
-    pinMode(LED, OUTPUT);
-    pinMode(motor, OUTPUT);
-    pinMode(pwm, OUTPUT);
-    digitalWrite(LED, HIGH);
-    digitalWrite(motor, HIGH);
-    analogWrite(pwm, 255);
-    Blynk.begin(auth, ssid, pass);
-    dht.begin();
-    timer.setInterval(1000L, DHT11sensor);
-    timer.setInterval(1000L, flamesensor);
-    timer.setInterval(1000L, pirsensor);
-    timer.setInterval(1000L, ultrasonic);
+// ========== DHT11 Temp & Humidity ==========
+void readDHT() {
+  float t = dht.readTemperature();
+  float h = dht.readHumidity();
+
+  if (isnan(t) || isnan(h)) {
+    Serial.println("Failed to read from DHT sensor");
+    return;
+  }
+
+  Serial.print("Temp: "); Serial.print(t); Serial.print(" °C | ");
+  Serial.print("Humidity: "); Serial.println(h);
+
+  Blynk.virtualWrite(V4, t);
+  Blynk.virtualWrite(V5, h);
+
+  // Optional: auto fan control
+  if (t >= 32) digitalWrite(RELAY_FAN, HIGH);
+  else if (t <= 28) digitalWrite(RELAY_FAN, LOW);
 }
 
-void DHT11sensor()
-{
-    float h = dht.readHumidity();
-    float t = dht.readTemperature();
-
-    if (isnan(h) || isnan(t))
-    {
-        Serial.println("Failed to read from DHT sensor!");
-        return;
+// ========== Flame Detection ==========
+void checkFlame() {
+  int flame = digitalRead(FLAME_SENSOR);
+  if (flame == LOW) {
+    digitalWrite(BUZZER, HIGH);
+    if (millis() - lastFlameAlert > ALERT_DELAY) {
+      Blynk.notify("🔥 Fire detected!");
+      Blynk.virtualWrite(V7, 1);
+      lastFlameAlert = millis();
     }
-    if (t < 28)
-    {
-        analogWrite(9, 0);
-        delay(100);
-    }
-
-    else if (t >= 28 && t <= 29)
-    {
-        analogWrite(pwm, 51);
-
-        delay(100);
-    }
-
-    else if (t >= 29 && t <= 30)
-    {
-        analogWrite(pwm, 102);
-
-        delay(100);
-    }
-
-    else if (t >= 30 && t <= 31)
-    {
-        analogWrite(pwm, 153);
-
-        delay(100);
-    }
-
-    else if (t >= 31 && t <= 32)
-    {
-        analogWrite(pwm, 204);
-
-        delay(100);
-    }
-    else if (t >= 32)
-    {
-        analogWrite(pwm, 255);
-
-        delay(100);
-    }
-    delay(3000);
-
-    Blynk.virtualWrite(V2, t);
-    Blynk.virtualWrite(V3, h);
+  } else {
+    digitalWrite(BUZZER, LOW);
+    Blynk.virtualWrite(V7, 0);
+  }
 }
 
-void flamesensor()
-{
-    bool value = digitalRead(flame);
-    if (value == 1)
-    {
-        digitalWrite(Buzzer, LOW);
+// ========== PIR Motion Detection ==========
+void checkPIR() {
+  int motion = digitalRead(PIR_SENSOR);
+  if (pirAlertEnabled && motion == HIGH) {
+    if (millis() - lastMotionAlert > ALERT_DELAY) {
+      Blynk.notify("🚨 Motion detected!");
+      lastMotionAlert = millis();
     }
-    else if (value == 0)
-    {
-        Blynk.notify("Warning! Fire was detected");
-        digitalWrite(Buzzer, HIGH);
-    }
-}
-void pirsensor()
-{
-    bool value = digitalRead(PIR);
-    if (pirbutton == 1)
-    {
-        if (value == 0)
-        {
-            digitalWrite(LED, LOW);
-        }
-        else if (value == 1)
-        {
-            Blynk.notify("Warning! Please check your security system");
-            digitalWrite(LED, HIGH);
-        }
-    }
+  }
 }
 
-void ultrasonic()
-{
-    digitalWrite(trig, LOW);
-    delayMicroseconds(4);
-    digitalWrite(trig, HIGH);
-    delayMicroseconds(10);
-    digitalWrite(trig, LOW);
-    long t = pulseIn(echo, HIGH);
-    long cm = t / 29 / 2;
-    if (cm < 5)
-    {
-        digitalWrite(motor, LOW);
-        delay(1000);
-    }
+// ========== Ultrasonic Water Level ==========
+void checkWaterLevel() {
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
 
-    else if (cm > 60)
-    {
+  long duration = pulseIn(ECHO_PIN, HIGH);
+  long distance = duration / 29 / 2;
 
-        digitalWrite(motor, HIGH);
-        delay(1000);
-    }
-    Blynk.virtualWrite(V4, cm);
+  Serial.print("Water Level: "); Serial.print(distance); Serial.println(" cm");
+  Blynk.virtualWrite(V6, distance);
+
+  if (distance > 30 && distance < 200) {
+    digitalWrite(RELAY_PUMP, HIGH);
+  } else if (distance <= 10) {
+    digitalWrite(RELAY_PUMP, LOW);
+  }
 }
 
-void loop()
-{
-    Blynk.run();
-    timer.run();
+void loop() {
+  Blynk.run();
+  timer.run();
 }
