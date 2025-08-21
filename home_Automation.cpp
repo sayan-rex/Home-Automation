@@ -1,37 +1,44 @@
+// Home Automation Main Controller
+// Author: Sayan Rex
+// Repository: https://github.com/sayan-rex/Home-Automation
+// Description: ESP8266-based IoT system for smart home control via Blynk platform
+// ===============================================================================
+
 #define BLYNK_PRINT Serial
 
 #include <ESP8266WiFi.h>
 #include <BlynkSimpleEsp8266.h>
 #include <DHT.h>
 
-// ========== Credentials ==========
-char auth[] = "Your_Blynk_Auth_Token";
-char ssid[] = "Your_WiFi_SSID";
-char pass[] = "Your_WiFi_Password";
+// =================== Credentials ===================
+constexpr char AUTH_TOKEN[] = "Your_Blynk_Auth_Token";
+constexpr char WIFI_SSID[] = "Your_WiFi_SSID";
+constexpr char WIFI_PASS[] = "Your_WiFi_Password";
 
-// ========== Pin Definitions ==========
-#define RELAY_LIGHT D0     // GPIO16
-#define RELAY_FAN D1       // GPIO5
-#define RELAY_PUMP D2      // GPIO4
-#define DHTPIN D3          // GPIO0
-#define FLAME_SENSOR D4    // GPIO2
-#define BUZZER D5          // GPIO14
-#define PIR_SENSOR D6      // GPIO12
-#define TRIG_PIN D7        // GPIO13
-#define ECHO_PIN D8        // GPIO15
+// =================== Pin Definitions ===================
+constexpr uint8_t RELAY_LIGHT   = D0; // GPIO16
+constexpr uint8_t RELAY_FAN     = D1; // GPIO5
+constexpr uint8_t RELAY_PUMP    = D2; // GPIO4
+constexpr uint8_t DHTPIN        = D3; // GPIO0
+constexpr uint8_t FLAME_SENSOR  = D4; // GPIO2
+constexpr uint8_t BUZZER        = D5; // GPIO14
+constexpr uint8_t PIR_SENSOR    = D6; // GPIO12
+constexpr uint8_t TRIG_PIN      = D7; // GPIO13
+constexpr uint8_t ECHO_PIN      = D8; // GPIO15
 
+// =================== DHT Sensor Setup ===================
 #define DHTTYPE DHT11
 DHT dht(DHTPIN, DHTTYPE);
 
 BlynkTimer timer;
 
-// ========== State Variables ==========
+// =================== State Variables ===================
 bool pirAlertEnabled = true;
 unsigned long lastMotionAlert = 0;
 unsigned long lastFlameAlert = 0;
-#define ALERT_DELAY 10000 // 10 sec cooldown
+constexpr unsigned long ALERT_DELAY = 10000UL; // 10 sec cooldown
 
-// ========== Blynk Virtual Pins ==========
+// =================== Blynk Virtual Pins ===================
 /*
 V0 - Button: Light (RELAY_LIGHT)
 V1 - Button: Fan (RELAY_FAN)
@@ -43,7 +50,7 @@ V6 - Display: Water Level
 V7 - LED: Fire Alert Indicator
 */
 
-// ========== Blynk Controls ==========
+// =================== Blynk Controls ===================
 BLYNK_WRITE(V0) { digitalWrite(RELAY_LIGHT, param.asInt()); }
 BLYNK_WRITE(V1) { digitalWrite(RELAY_FAN, param.asInt()); }
 BLYNK_WRITE(V2) { digitalWrite(RELAY_PUMP, param.asInt()); }
@@ -69,7 +76,7 @@ void setup() {
   digitalWrite(BUZZER, LOW);
 
   dht.begin();
-  Blynk.begin(auth, ssid, pass);
+  Blynk.begin(AUTH_TOKEN, WIFI_SSID, WIFI_PASS);
 
   // Timed Tasks
   timer.setInterval(2000L, readDHT);
@@ -78,28 +85,28 @@ void setup() {
   timer.setInterval(3000L, checkWaterLevel);
 }
 
-// ========== DHT11 Temp & Humidity ==========
+// =================== DHT11 Temp & Humidity ===================
 void readDHT() {
-  float t = dht.readTemperature();
-  float h = dht.readHumidity();
+  float temperature = dht.readTemperature();
+  float humidity = dht.readHumidity();
 
-  if (isnan(t) || isnan(h)) {
-    Serial.println("Failed to read from DHT sensor");
+  if (isnan(temperature) || isnan(humidity)) {
+    Serial.println("[Error] Failed to read from DHT sensor");
     return;
   }
 
-  Serial.print("Temp: "); Serial.print(t); Serial.print(" °C | ");
-  Serial.print("Humidity: "); Serial.println(h);
+  Serial.print("Temperature: "); Serial.print(temperature); Serial.print(" °C | ");
+  Serial.print("Humidity: "); Serial.println(humidity);
 
-  Blynk.virtualWrite(V4, t);
-  Blynk.virtualWrite(V5, h);
+  Blynk.virtualWrite(V4, temperature);
+  Blynk.virtualWrite(V5, humidity);
 
-  // Optional: auto fan control
-  if (t >= 32) digitalWrite(RELAY_FAN, HIGH);
-  else if (t <= 28) digitalWrite(RELAY_FAN, LOW);
+  // Auto Fan Control Logic
+  if (temperature >= 32.0) digitalWrite(RELAY_FAN, HIGH);
+  else if (temperature <= 28.0) digitalWrite(RELAY_FAN, LOW);
 }
 
-// ========== Flame Detection ==========
+// =================== Flame Detection ===================
 void checkFlame() {
   int flame = digitalRead(FLAME_SENSOR);
   if (flame == LOW) {
@@ -115,7 +122,7 @@ void checkFlame() {
   }
 }
 
-// ========== PIR Motion Detection ==========
+// =================== PIR Motion Detection ===================
 void checkPIR() {
   int motion = digitalRead(PIR_SENSOR);
   if (pirAlertEnabled && motion == HIGH) {
@@ -126,7 +133,7 @@ void checkPIR() {
   }
 }
 
-// ========== Ultrasonic Water Level ==========
+// =================== Ultrasonic Water Level ===================
 void checkWaterLevel() {
   digitalWrite(TRIG_PIN, LOW);
   delayMicroseconds(2);
@@ -140,6 +147,7 @@ void checkWaterLevel() {
   Serial.print("Water Level: "); Serial.print(distance); Serial.println(" cm");
   Blynk.virtualWrite(V6, distance);
 
+  // Pump Control
   if (distance > 30 && distance < 200) {
     digitalWrite(RELAY_PUMP, HIGH);
   } else if (distance <= 10) {
