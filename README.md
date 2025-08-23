@@ -61,7 +61,7 @@ A low-cost IoT solution to control and monitor home appliances using **Google As
 
 ---
 
-## 🗣IFTTT Setup
+## IFTTT Setup
 
 1. Create an IFTTT account
 2. Create Applet: "If Google Assistant → Then Webhook"
