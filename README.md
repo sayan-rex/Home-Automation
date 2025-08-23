@@ -1,4 +1,4 @@
-# 🔊 Voice-Controlled Home Automation & Security System
+# Voice-Controlled Home Automation & Security System
 
 A low-cost IoT solution to control and monitor home appliances using **Google Assistant**, **NodeMCU**, **IFTTT**, and the **Blynk app**. This project includes:
 
@@ -12,17 +12,17 @@ A low-cost IoT solution to control and monitor home appliances using **Google As
 
 ---
 
-## 🧠 Features
+## Features
 
-- 📱 Control light, fan, and water pump with voice commands
-- 📊 Live temperature, humidity, water level, fire alert status on Blynk
-- 🔥 Fire detection with buzzer + app alert
-- 🕵️ Motion detection with notification
-- 💧 Automatic water pump control
+- Control light, fan, and water pump with voice commands
+- Live temperature, humidity, water level, fire alert status on Blynk
+- Fire detection with buzzer + app alert
+- Motion detection with notification
+- Automatic water pump control
 
 ---
 
-## 📲 Required Apps
+## Required Apps
 
 - [Blynk Legacy App (Android)](https://play.google.com/store/apps/details?id=cc.blynk)
 - [IFTTT](https://ifttt.com)
@@ -30,7 +30,7 @@ A low-cost IoT solution to control and monitor home appliances using **Google As
 
 ---
 
-## 🧰 Hardware Required
+## Hardware Required
 
 | Component        | Quantity |
 |------------------|----------|
@@ -46,7 +46,7 @@ A low-cost IoT solution to control and monitor home appliances using **Google As
 
 ---
 
-## 🧾 Virtual Pin Mapping (Blynk)
+## Virtual Pin Mapping (Blynk)
 
 | Widget          | Pin  | Function             |
 |------------------|------|----------------------|
@@ -61,7 +61,7 @@ A low-cost IoT solution to control and monitor home appliances using **Google As
 
 ---
 
-## 🗣️ IFTTT Setup
+## 🗣IFTTT Setup
 
 1. Create an IFTTT account
 2. Create Applet: "If Google Assistant → Then Webhook"
